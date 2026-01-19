@@ -23,19 +23,30 @@ PASSWORD = None   # Set to None if Redis has no password
 PRIVATE_CHAT_ID = -1000000000000
 
 
-# Admin user IDs (MUST be integers)
-# Add multiple IDs inside list
+# ================== OWNER & ADMIN SYSTEM ==================
+
+# Full control (2–3 numeric IDs supported)
+OWNERS = [
+    803003146,
+    # 987654321,
+    # 1122334455
+]
+
+# Limited control
 ADMINS = [
-    803003146,   # Example: Your Telegram ID
-    # 123456789,
+    803003146,
+    # 555666777
 ]
 
 
-# ================== OPTIONAL FLAGS ==================
+# ================== FREE USER LIMIT SYSTEM ==================
 
-# If you still want to support single ADMIN broadcast logs etc.
-# (Used in old redeem handler — safe to keep)
-ADMIN_ID = 803003146
+FREE_DAILY_LIMIT = 3
+TIMEZONE = "Asia/Kolkata"
+RESET_AT_MIDNIGHT = True
+
+
+# ================== TERABOX API CONFIG ==================
 
 TERABOX_API_BASE = "https://api.ntm.com/api/terabox"
 TERABOX_API_TOKEN = "NTMPASS"
