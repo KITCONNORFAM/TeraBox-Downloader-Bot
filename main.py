@@ -1,28 +1,12 @@
-import asyncio
-import os
-import time
-from uuid import uuid4
-from datetime import datetime
 import pytz
-
 import redis
-import telethon
+from datetime import datetime
 from telethon import TelegramClient, events, Button
-from telethon.tl.functions.messages import ForwardMessagesRequest
-from telethon.types import Message, UpdateNewMessage
+from telethon.types import Message
 
-from cansend import CanSend
 from config import *
 from terabox import get_data   # ❗ UNTOUCHED
-from tools import (
-    convert_seconds,
-    download_file,
-    download_image_to_bytesio,
-    extract_code_from_url,
-    get_formatted_size,
-    get_urls_from_string,
-    is_user_on_chat,
-)
+from tools import get_urls_from_string
 
 bot = TelegramClient("tele", API_ID, API_HASH)
 
@@ -35,16 +19,9 @@ db = redis.Redis(
 
 PREMIUM_USERS_KEY = "premium_users"
 DAILY_LIMIT_KEY = "daily_limit"
-
 IST = pytz.timezone("Asia/Kolkata")
 
 # ================== HELPERS ==================
-
-def is_owner(uid):
-    return uid in OWNERS
-
-def is_admin(uid):
-    return uid in ADMINS or uid in OWNERS
 
 def today_key(uid):
     today = datetime.now(IST).strftime("%Y-%m-%d")
@@ -66,8 +43,8 @@ def can_download(uid):
 
 # ================== /START ==================
 
-@bot.on(events.NewMessage(pattern="/start", incoming=True))
-async def start(m: UpdateNewMessage):
+@bot.on(events.NewMessage(pattern="/start"))
+async def start(m):
     user = await bot.get_entity(m.sender_id)
 
     text = f"""
@@ -87,9 +64,9 @@ Welcome back to Tera Box Bots!!
 
     await m.reply(text, buttons=buttons)
 
-# ================== HELP ==================
+# ================== /HELP ==================
 
-@bot.on(events.NewMessage(pattern="/help", incoming=True))
+@bot.on(events.NewMessage(pattern="/help"))
 async def help_cmd(m):
     await m.reply("""
 Available Commands:
@@ -98,25 +75,19 @@ Available Commands:
 /help - Help menu  
 /plan - Premium plans  
 /status - Your plan  
-/redeem - Redeem code  
 
 Free Users:
 • 3 downloads/day  
 • Reset at 12:00 AM IST  
-
-Premium:
-• Unlimited  
-• No ads  
-• Priority  
 
 Support:
 @charliespringfam  
 @Badmaashbachhax
 """)
 
-# ================== PLAN ==================
+# ================== /PLAN ==================
 
-@bot.on(events.NewMessage(pattern="/plan", incoming=True))
+@bot.on(events.NewMessage(pattern="/plan"))
 async def plan(m):
     await m.reply("""
 💎 PREMIUM PLANS
@@ -127,15 +98,11 @@ async def plan(m):
 ⭐ BEST VALUE – ₹149 | 75 days  
 👑 VIP CLUB – ₹199 | 120 days  
 ♾️ YEARLY – ₹399 | 365 days  
-
-To buy:  
-@charliespringfam  
-@Badmaashbachhax
 """)
 
-# ================== STATUS ==================
+# ================== /STATUS ==================
 
-@bot.on(events.NewMessage(pattern="/status", incoming=True))
+@bot.on(events.NewMessage(pattern="/status"))
 async def status(m):
     uid = m.sender_id
     if db.sismember(PREMIUM_USERS_KEY, uid):
@@ -144,29 +111,29 @@ async def status(m):
         used = int(db.get(today_key(uid)) or 0)
         await m.reply(f"🆓 Free User\nDownloads used today: {used}/3")
 
-# ================== ADMIN COMMANDS ==================
+# ================== ADMIN ==================
 
-@bot.on(events.NewMessage(pattern="/addadmin (.*)", from_users=OWNERS))
+@bot.on(events.NewMessage(pattern="/addadmin (.+)", from_users=OWNERS))
 async def add_admin(m):
     new = int(m.pattern_match.group(1))
     if new not in ADMINS:
         ADMINS.append(new)
         await m.reply(f"✅ Added admin {new}")
 
-@bot.on(events.NewMessage(pattern="/removeadmin (.*)", from_users=OWNERS))
+@bot.on(events.NewMessage(pattern="/removeadmin (.+)", from_users=OWNERS))
 async def rem_admin(m):
     rem = int(m.pattern_match.group(1))
     if rem in ADMINS:
         ADMINS.remove(rem)
         await m.reply(f"❌ Removed admin {rem}")
 
-@bot.on(events.NewMessage(pattern="/pre (.*)", from_users=ADMINS))
+@bot.on(events.NewMessage(pattern="/pre (.+)", from_users=ADMINS))
 async def add_premium(m):
     uid = int(m.pattern_match.group(1))
     db.sadd(PREMIUM_USERS_KEY, uid)
     await m.reply("User promoted to premium")
 
-@bot.on(events.NewMessage(pattern="/de (.*)", from_users=ADMINS))
+@bot.on(events.NewMessage(pattern="/de (.+)", from_users=ADMINS))
 async def remove_premium(m):
     uid = int(m.pattern_match.group(1))
     db.srem(PREMIUM_USERS_KEY, uid)
@@ -174,7 +141,7 @@ async def remove_premium(m):
 
 # ================== QUEUE ==================
 
-@bot.on(events.NewMessage(pattern="/queue", incoming=True))
+@bot.on(events.NewMessage(pattern="/queue"))
 async def show_queue(m):
     uid = m.sender_id
     q = db.lrange(f"queue:{uid}", 0, -1)
@@ -184,13 +151,13 @@ async def show_queue(m):
     text = "\n".join([f"{i+1}. {x}" for i, x in enumerate(q)])
     await m.reply(f"📦 Your Queue:\n{text}")
 
-# ================== DOWNLOAD HANDLER ==================
+# ================== DOWNLOAD ==================
 
-@bot.on(events.NewMessage(incoming=True, func=lambda m: m.text and get_urls_from_string(m.text)))
+@bot.on(events.NewMessage(func=lambda m: m.text and get_urls_from_string(m.text)))
 async def downloader(m: Message):
     uid = m.sender_id
 
-    allowed, status = can_download(uid)
+    allowed, _ = can_download(uid)
 
     if not allowed:
         await m.reply("❌ Daily limit reached.\nWait till 12:00 AM IST or buy premium.")
@@ -199,7 +166,7 @@ async def downloader(m: Message):
     url = get_urls_from_string(m.text)
     await m.reply("⏳ Processing your link...")
 
-    data = get_data(url)   # ❗ UNTOUCHED COOKIE LOGIC
+    data = get_data(url)   # ❗ COOKIE LOGIC UNTOUCHED
 
     if not data:
         return await m.reply("❌ API error or invalid link.")
@@ -211,7 +178,7 @@ async def downloader(m: Message):
 
     await m.reply(f"✅ Download ready:\n{data['file_name']}")
 
-# ================== START BOT ==================
+# ================== RUN ==================
 
 bot.start(bot_token=BOT_TOKEN)
 bot.run_until_disconnected()
