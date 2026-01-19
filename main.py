@@ -188,4 +188,33 @@ async def downloader(m: Message):
 # ================== START BOT ==================
 
 bot.start(bot_token=BOT_TOKEN)
-bot.run_until_disconnected()
+bot.run_until_disconnected() 
+@Client.on_message(filters.command("queue"))
+async def show_queue(_, msg):
+    uid = msg.from_user.id
+    q = r.lrange(f"queue:{uid}", 0, -1)
+    if not q:
+        return await msg.reply("📭 Queue empty")
+
+    text = "\n".join([f"{i+1}. {x}" for i, x in enumerate(q)])
+    await msg.reply(f"📦 Your Queue:\n{text}")
+    @Client.on_message(filters.command("addadmin") & filters.user(OWNERS))
+async def add_admin(_, msg):
+    new = int(msg.text.split()[1])
+    if new not in ADMINS:
+        ADMINS.append(new)
+        await msg.reply(f"✅ Added admin {new}")
+python
+Copy code
+@Client.on_message(filters.command("removeadmin") & filters.user(OWNERS))
+async def rem_admin(_, msg):
+    rem = int(msg.text.split()[1])
+    if rem in ADMINS:
+        ADMINS.remove(rem)
+        await msg.reply(f"❌ Removed admin {rem}")
+        @Client.on_message(filters.command("pre") & filters.user(ADMINS))
+async def give_premium(_, msg):
+    uid = int(msg.text.split()[1])
+    days = int(msg.text.split()[2])
+    add_premium(uid, days)
+    await msg.reply(f"✅ Premium given to {uid} for {days} days")
