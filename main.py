@@ -13,7 +13,7 @@ from telethon.types import Message, UpdateNewMessage
 
 from cansend import CanSend
 from config import *
-from terabox import get_data
+from terabox import get_data   # ❗ UNTOUCHED
 from tools import (
     convert_seconds,
     download_file,
@@ -144,7 +144,21 @@ async def status(m):
         used = int(db.get(today_key(uid)) or 0)
         await m.reply(f"🆓 Free User\nDownloads used today: {used}/3")
 
-# ================== ADMIN ==================
+# ================== ADMIN COMMANDS ==================
+
+@bot.on(events.NewMessage(pattern="/addadmin (.*)", from_users=OWNERS))
+async def add_admin(m):
+    new = int(m.pattern_match.group(1))
+    if new not in ADMINS:
+        ADMINS.append(new)
+        await m.reply(f"✅ Added admin {new}")
+
+@bot.on(events.NewMessage(pattern="/removeadmin (.*)", from_users=OWNERS))
+async def rem_admin(m):
+    rem = int(m.pattern_match.group(1))
+    if rem in ADMINS:
+        ADMINS.remove(rem)
+        await m.reply(f"❌ Removed admin {rem}")
 
 @bot.on(events.NewMessage(pattern="/pre (.*)", from_users=ADMINS))
 async def add_premium(m):
@@ -157,6 +171,18 @@ async def remove_premium(m):
     uid = int(m.pattern_match.group(1))
     db.srem(PREMIUM_USERS_KEY, uid)
     await m.reply("User removed from premium")
+
+# ================== QUEUE ==================
+
+@bot.on(events.NewMessage(pattern="/queue", incoming=True))
+async def show_queue(m):
+    uid = m.sender_id
+    q = db.lrange(f"queue:{uid}", 0, -1)
+    if not q:
+        return await m.reply("📭 Queue empty")
+
+    text = "\n".join([f"{i+1}. {x}" for i, x in enumerate(q)])
+    await m.reply(f"📦 Your Queue:\n{text}")
 
 # ================== DOWNLOAD HANDLER ==================
 
@@ -173,7 +199,7 @@ async def downloader(m: Message):
     url = get_urls_from_string(m.text)
     await m.reply("⏳ Processing your link...")
 
-    data = get_data(url)  # ❗ untouched
+    data = get_data(url)   # ❗ UNTOUCHED COOKIE LOGIC
 
     if not data:
         return await m.reply("❌ API error or invalid link.")
@@ -188,33 +214,4 @@ async def downloader(m: Message):
 # ================== START BOT ==================
 
 bot.start(bot_token=BOT_TOKEN)
-bot.run_until_disconnected() 
-@Client.on_message(filters.command("queue"))
-async def show_queue(_, msg):
-    uid = msg.from_user.id
-    q = r.lrange(f"queue:{uid}", 0, -1)
-    if not q:
-        return await msg.reply("📭 Queue empty")
-
-    text = "\n".join([f"{i+1}. {x}" for i, x in enumerate(q)])
-    await msg.reply(f"📦 Your Queue:\n{text}")
-    @Client.on_message(filters.command("addadmin") & filters.user(OWNERS))
-async def add_admin(_, msg):
-    new = int(msg.text.split()[1])
-    if new not in ADMINS:
-        ADMINS.append(new)
-        await msg.reply(f"✅ Added admin {new}")
-python
-Copy code
-@Client.on_message(filters.command("removeadmin") & filters.user(OWNERS))
-async def rem_admin(_, msg):
-    rem = int(msg.text.split()[1])
-    if rem in ADMINS:
-        ADMINS.remove(rem)
-        await msg.reply(f"❌ Removed admin {rem}")
-        @Client.on_message(filters.command("pre") & filters.user(ADMINS))
-async def give_premium(_, msg):
-    uid = int(msg.text.split()[1])
-    days = int(msg.text.split()[2])
-    add_premium(uid, days)
-    await msg.reply(f"✅ Premium given to {uid} for {days} days")
+bot.run_until_disconnected()
