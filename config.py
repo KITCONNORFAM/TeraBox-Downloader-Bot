@@ -14,7 +14,7 @@ BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
 HOST = "127.0.0.1"
 PORT = 6379
 PASSWORD = None   # Set to None if Redis has no password
-
+COOKIE = ""
 
 # ================== BOT SETTINGS ==================
 
